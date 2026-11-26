@@ -1,0 +1,1160 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>예술의전당 공연·전시 입장객 현황 대시보드</title>
+<style>
+/* =========================================================
+   1. 디자인 토큰 (색상·글꼴)
+   공연 = 와인(무대 커튼), 전시 = 청록 회색(미술관 벽)
+   ========================================================= */
+:root {
+  --ink: #1F2328;        /* 본문 글자 */
+  --ink2: #57606A;       /* 보조 글자 */
+  --muted: #8C959F;      /* 흐린 글자·축 */
+  --line: #E4E6EA;       /* 구분선·격자 */
+  --panel: #FAFAF8;      /* 패널 배경 */
+  --bg: #FFFFFF;
+  --perf: #7A2E3A;       /* 공연 */
+  --exh: #3F6E73;        /* 전시 */
+  --other: #9AA0A6;      /* 기타 분야 */
+  --accent: #2F3A45;     /* 버튼 */
+  --ok: #2E6B3F;
+  --err: #A12D2D;
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--ink); }
+body {
+  font-family: "Pretendard", "Malgun Gothic", "맑은 고딕", "Apple SD Gothic Neo", system-ui, sans-serif;
+  font-size: 14px; line-height: 1.5;
+}
+.num, td.n, .kpi-value { font-variant-numeric: tabular-nums; }
+.wrap { max-width: 1280px; margin: 0 auto; padding: 24px 24px 48px; }
+
+/* ---------- 머리글 ---------- */
+header.top { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 12px;
+  border-bottom: 1px solid var(--line); padding-bottom: 16px; margin-bottom: 16px; }
+header.top h1 { margin: 0; font-size: 22px; font-weight: 700; letter-spacing: -0.02em; }
+header.top .sub { color: var(--ink2); font-size: 13px; margin-top: 4px; }
+.source { font-size: 13px; color: var(--ink2); }
+.source b { color: var(--ink); font-weight: 600; }
+.tag { display: inline-block; font-size: 11px; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--line); color: var(--ink2); margin-left: 6px; }
+
+/* ---------- 버튼·입력 ---------- */
+button, select, input[type=search] { font: inherit; color: var(--ink); }
+.btn { border: 1px solid #C9CDD2; background: #fff; border-radius: 6px; padding: 6px 14px; cursor: pointer; }
+.btn:hover { border-color: var(--accent); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn:disabled { opacity: .45; cursor: default; }
+select, input[type=search] { border: 1px solid #C9CDD2; border-radius: 6px; padding: 5px 8px; background: #fff; }
+select:focus, input:focus, .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* ---------- 업로드 ---------- */
+.upload { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: stretch; margin-bottom: 12px; }
+.drop { border: 1.5px dashed #C3C8CE; border-radius: 8px; padding: 14px 16px; background: var(--panel);
+  display: flex; align-items: center; gap: 12px; cursor: pointer; color: var(--ink2); }
+.drop.over { border-color: var(--accent); background: #F1F3F5; color: var(--ink); }
+.drop strong { color: var(--ink); }
+.upload .actions { display: flex; gap: 8px; align-items: center; }
+.msg { font-size: 13px; padding: 8px 12px; border-radius: 6px; margin-bottom: 12px; display: none; }
+.msg.show { display: block; }
+.msg.ok { background: #EEF5EF; color: var(--ok); border: 1px solid #CFE3D4; }
+.msg.err { background: #FBEEEE; color: var(--err); border: 1px solid #EBCACA; }
+.msg.info { background: #F2F4F6; color: var(--ink2); border: 1px solid var(--line); }
+
+/* ---------- 필터 ---------- */
+.filters { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; padding: 12px 16px;
+  border: 1px solid var(--line); border-radius: 8px; margin-bottom: 10px; }
+.filters label { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink2); }
+.filters select { min-width: 110px; }
+.filters .grow { flex: 1; }
+.notice { font-size: 13px; color: var(--ink2); margin: 0 0 16px; padding-left: 2px; }
+.notice::before { content: "※ "; }
+.print-only { display: none; }
+
+/* ---------- KPI ---------- */
+.kpis { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; margin-bottom: 16px; }
+.kpi { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px; min-width: 0; }
+.kpi-label { font-size: 13px; color: var(--ink2); }
+.kpi-value { font-size: 26px; font-weight: 700; letter-spacing: -0.02em; margin: 2px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.kpi-value small { font-size: 14px; font-weight: 500; color: var(--ink2); margin-left: 2px; }
+.kpi-value.text { font-size: 20px; line-height: 1.55; }
+.kpi-sub { font-size: 12px; color: var(--ink2); }
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 4px; vertical-align: 1px; }
+.dot.perf { background: var(--perf); } .dot.exh { background: var(--exh); } .dot.other { background: var(--other); }
+
+/* ---------- 카드·차트 ---------- */
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+.card { border: 1px solid var(--line); border-radius: 8px; padding: 14px 16px 12px; min-width: 0; }
+.card h2 { font-size: 15px; margin: 0; font-weight: 600; }
+.card .head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
+.card .desc { font-size: 12px; color: var(--muted); }
+.legend { display: flex; gap: 12px; font-size: 12px; color: var(--ink2); }
+.legend span { display: inline-flex; align-items: center; }
+.legend i { width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; display: inline-block; }
+.chart { width: 100%; min-height: 60px; }
+.chart svg { display: block; width: 100%; height: auto; overflow: visible; }
+.chart text { font-family: inherit; fill: var(--muted); font-size: 11px; }
+.foot { font-size: 12px; color: var(--muted); margin-top: 6px; }
+.empty { color: var(--muted); font-size: 13px; padding: 24px 0; text-align: center; }
+
+/* 가로 막대(장소·TOP10) */
+.hbars { display: grid; grid-template-columns: minmax(90px, 30%) 1fr auto; gap: 6px 10px; align-items: center; font-size: 13px; }
+.hbars .lab { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: var(--ink); }
+.hbars .track { display: flex; gap: 2px; height: 12px; }
+.hbars .seg { height: 100%; min-width: 0; }
+.hbars .seg:last-child { border-radius: 0 4px 4px 0; }
+.hbars .val { color: var(--ink2); text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.top10 .lab { display: flex; gap: 6px; align-items: center; }
+.top10 .rank { color: var(--muted); width: 18px; text-align: right; flex: none; }
+.top10 .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ---------- 상세 표 ---------- */
+.table-tools { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-bottom: 8px; }
+.table-tools input[type=search] { width: 260px; }
+.table-tools .info { margin-left: auto; font-size: 13px; color: var(--ink2); }
+.tbl-wrap { overflow-x: auto; }
+table.data { width: 100%; border-collapse: collapse; font-size: 13px; }
+table.data th, table.data td { padding: 6px 8px; border-bottom: 1px solid var(--line); text-align: left; white-space: nowrap; }
+table.data th { font-weight: 600; color: var(--ink2); background: var(--panel); position: sticky; top: 0; }
+table.data th.sortable { cursor: pointer; user-select: none; }
+table.data th.sortable:hover { color: var(--ink); }
+table.data th .arrow { font-size: 10px; margin-left: 3px; color: var(--muted); }
+table.data td.n, table.data th.n { text-align: right; }
+table.data td.nm { white-space: normal; min-width: 220px; }
+table.data tbody tr:hover { background: #F6F7F8; }
+.pager { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin-top: 12px; }
+.pager button { min-width: 34px; padding: 4px 8px; border: 1px solid #D0D4D9; background: #fff; border-radius: 5px; cursor: pointer; }
+.pager button.cur { background: var(--accent); border-color: var(--accent); color: #fff; }
+.pager button:disabled { opacity: .4; cursor: default; }
+
+/* ---------- 툴팁·로딩·드래그 오버레이 ---------- */
+#tip { position: fixed; z-index: 50; pointer-events: none; background: #fff; border: 1px solid #D0D4D9; border-radius: 6px;
+  box-shadow: 0 4px 14px rgba(0,0,0,.08); padding: 8px 10px; font-size: 12px; color: var(--ink); display: none; max-width: 320px; }
+#tip .t { font-weight: 600; margin-bottom: 4px; }
+#tip .r { display: flex; justify-content: space-between; gap: 14px; color: var(--ink2); }
+#tip .r b { color: var(--ink); font-weight: 600; font-variant-numeric: tabular-nums; }
+#loading { position: fixed; inset: 0; background: rgba(255,255,255,.8); z-index: 60; display: none; align-items: center; justify-content: center; font-size: 15px; color: var(--ink); }
+#loading.show { display: flex; }
+#loading .box { border: 1px solid var(--line); background: #fff; padding: 18px 24px; border-radius: 8px; box-shadow: 0 6px 20px rgba(0,0,0,.08); }
+#dragCover { position: fixed; inset: 0; z-index: 55; display: none; align-items: center; justify-content: center;
+  background: rgba(47,58,69,.08); border: 3px dashed var(--accent); font-size: 18px; color: var(--accent); pointer-events: none; }
+#dragCover.show { display: flex; }
+
+@media (max-width: 1000px) { .kpis { grid-template-columns: repeat(2, 1fr); } .grid { grid-template-columns: 1fr; } .upload { grid-template-columns: 1fr; } }
+
+/* =========================================================
+   2. 인쇄 / PDF (A4 세로)
+   ========================================================= */
+@page { size: A4 portrait; margin: 12mm 10mm; }
+@media print {
+  html, body { font-size: 10px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .wrap { max-width: none; padding: 0; }
+  .no-print, .upload, .filters, .msg, .table-tools, .pager, #tip, #loading, #dragCover { display: none !important; }
+  .print-only { display: block; }
+  header.top { padding-bottom: 6px; margin-bottom: 8px; }
+  header.top h1 { font-size: 16px; }
+  .kpis { grid-template-columns: repeat(5, 1fr); gap: 6px; margin-bottom: 8px; }
+  .kpi { padding: 6px 8px; break-inside: avoid; }
+  .kpi-value { font-size: 15px; } .kpi-value.text { font-size: 12px; } .kpi-value small { font-size: 10px; }
+  .kpi-sub, .kpi-label { font-size: 9px; }
+  .grid { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+  .card { padding: 8px 10px; break-inside: avoid; page-break-inside: avoid; }
+  .card h2 { font-size: 11px; }
+  .hbars { font-size: 9px; gap: 3px 6px; } .hbars .track { height: 8px; }
+  .chart text { font-size: 10px; }
+  .notice { font-size: 9px; margin-bottom: 8px; }
+  section.detail { display: none !important; }   /* 상세 표는 PDF에서 제외 */
+  .foot, .legend, .card .desc, header.top .sub, .source { font-size: 9px; }
+  .legend i { width: 7px; height: 7px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- ===== 머리글: 제목·현재 데이터·PDF 버튼 ===== -->
+  <header class="top">
+    <div>
+      <h1>예술의전당 공연·전시 입장객 현황</h1>
+      <div class="sub">회차(공연) 또는 일자(전시)별 입장객 기준 · 모든 처리는 이 브라우저 안에서만 이루어집니다</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <div class="source" id="sourceInfo"></div>
+      <button class="btn primary no-print" id="btnPrint" type="button">PDF 저장</button>
+    </div>
+  </header>
+
+  <!-- ===== 업로드 영역 ===== -->
+  <div class="upload">
+    <label class="drop" id="dropZone" tabindex="0">
+      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M12 16V4m0 0-4 4m4-4 4 4"/><path d="M4 16v3a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-3"/></svg>
+      <span><strong>Excel(xlsx)·CSV 파일을 여기에 끌어다 놓거나 클릭해서 선택</strong><br>
+      파일은 서버로 전송되지 않습니다. 모든 시트를 검사해 분석 시트를 자동으로 고르고, 기존 데이터를 새 데이터로 교체합니다.</span>
+      <input type="file" id="fileInput" accept=".xlsx,.xlsm,.csv,.txt,.tsv" hidden>
+    </label>
+    <div class="actions">
+      <button class="btn" id="btnRestore" type="button" disabled>기본 데이터 복원</button>
+    </div>
+  </div>
+  <div class="msg" id="msg" role="status" aria-live="polite"></div>
+
+  <!-- ===== 필터 (AND 조건) ===== -->
+  <div class="filters" id="filters">
+    <label>연도 <select id="fYear"></select></label>
+    <label>분야 <select id="fField"></select></label>
+    <label>장소 <select id="fPlace"></select></label>
+    <label>구분 <select id="fGubun"></select></label>
+    <span class="grow"></span>
+    <button class="btn" id="btnReset" type="button">필터 초기화</button>
+  </div>
+  <p class="print-only notice" id="printFilters"></p>
+  <p class="notice" id="exhNotice"></p>
+
+  <!-- ===== KPI ===== -->
+  <div class="kpis" id="kpis"></div>
+
+  <!-- ===== 차트 ===== -->
+  <div class="grid">
+    <section class="card">
+      <div class="head"><h2>연도별 입장객 추이</h2><div class="legend" data-legend="both"></div></div>
+      <div class="chart" id="chYear"></div>
+      <div class="foot" id="footYear"></div>
+    </section>
+    <section class="card">
+      <div class="head"><h2>장소별 입장객 비교</h2><div class="legend" data-legend="both"></div></div>
+      <div id="chPlace"></div>
+    </section>
+    <section class="card">
+      <div class="head"><h2>월별 입장객 패턴</h2><div class="legend" data-legend="both"></div></div>
+      <div class="chart" id="chMonth"></div>
+    </section>
+    <section class="card">
+      <div class="head"><h2>요일별 입장객 패턴</h2><div class="legend" data-legend="both"></div></div>
+      <div class="chart" id="chDow"></div>
+    </section>
+    <section class="card">
+      <div class="head"><h2>공연 시간대별 입장객</h2><span class="desc">공연만 집계</span></div>
+      <div class="chart" id="chSlot"></div>
+      <div class="foot" id="footSlot"></div>
+    </section>
+    <section class="card">
+      <div class="head"><h2>공연·전시명 입장객 TOP 10</h2><div class="legend" data-legend="both"></div></div>
+      <div id="top10"></div>
+    </section>
+  </div>
+
+  <!-- ===== 상세 데이터 ===== -->
+  <section class="card detail">
+    <div class="head"><h2>상세 데이터</h2><span class="desc">PDF 저장 시 제외됩니다</span></div>
+    <div class="table-tools">
+      <input type="search" id="search" placeholder="공연·전시명 검색" aria-label="공연·전시명 검색">
+      <label>표시 <select id="pageSize"><option>20</option><option>50</option><option>100</option></select> 행</label>
+      <span class="info" id="tableInfo"></span>
+    </div>
+    <div class="tbl-wrap">
+      <table class="data" id="tbl"><thead></thead><tbody></tbody></table>
+    </div>
+    <div class="pager" id="pager"></div>
+  </section>
+</div>
+
+<div id="tip"></div>
+<div id="loading"><div class="box" id="loadingText">불러오는 중…</div></div>
+<div id="dragCover">파일을 놓으면 분석을 시작합니다</div>
+
+<!-- 기본 데이터: '분석용 데이터' 시트에서 분석에 필요한 열만 추출(사전 인코딩) -->
+<script id="default-data" type="application/json">__DEFAULT_DATA__</script>
+
+<script>
+'use strict';
+/* =========================================================
+   1. 데이터 컬럼명 매핑 (여기만 고치면 다른 헤더 이름도 인식)
+   - 키: 대시보드 내부 이름 / 값: 엑셀·CSV 헤더 후보(앞쪽일수록 우선)
+   - 비교 시 공백·가운뎃점·마침표·하이픈·밑줄·슬래시는 무시합니다.
+   ========================================================= */
+const COLUMN_MAP = {
+  name:  ['공연·전시명', '공연전시명', '공연/전시명', '공연명', '전시명', '작품명', '행사명', '명칭', '제목'],
+  field: ['분야', '공연전시구분', '장르구분'],
+  place: ['장소(표준)', '장소', '장소명', '공연장', '전시장', '공연장소', '장소(원본 정리)'],
+  gubun: ['구분', '기획대관', '기획/대관', '기획·대관', '기획대관구분'],
+  org:   ['주최·기획사', '주최/기획사', '기획사', '주최', '주최사', '주최기관'],
+  date:  ['일자', '날짜', '공연일', '공연일자', '전시일', '전시일자', '관람일', '일시'],
+  time:  ['시간', '공연시간', '시작시간', '시각'],
+  slot:  ['시간대'],
+  year:  ['연도', '년도'],
+  month: ['월'],
+  dow:   ['요일순서'],
+  dowText: ['요일'],
+  free:  ['무료(분석값)', '무료', '무료관객', '무료입장객', '초대'],
+  paid:  ['유료', '유료관객', '유료입장객'],
+  ex1:   ['추가 구분 1', '추가구분1'],
+  ex2:   ['추가 구분 2', '추가구분2'],
+  total: ['관객수', '입장객', '입장객수', '관람객수', '관객 수', '총 관객수', '합계', '총계', '계']
+};
+/* 필수 컬럼 규칙: 하나라도 없으면 업로드를 거부하고 기존 데이터를 유지 */
+const REQUIRED_RULES = [
+  { label: '공연·전시명', ok: m => m.name },
+  { label: '장소', ok: m => m.place },
+  { label: '일자 또는 연도', ok: m => m.date || m.year },
+  { label: '관객수(또는 무료+유료)', ok: m => m.total || (m.paid && m.free) }
+];
+/* 기본 데이터 출처 */
+const DEFAULT_SOURCE = { file: '예술의전당_공연및전시_입장객현황_통합_20251231.xlsx', sheet: '분석용 데이터' };
+/* 분야별 색상(공연·전시 일관 유지) */
+const KIND = [
+  { key: 'perf', label: '공연', color: '#7A2E3A' },
+  { key: 'exh',  label: '전시', color: '#3F6E73' },
+  { key: 'other', label: '기타', color: '#9AA0A6' }
+];
+const SLOT_ORDER = ['오전', '오후', '저녁', '심야'];
+const DOW_LABELS = ['월', '화', '수', '목', '금', '토', '일'];
+const STR_KEYS = ['field', 'name', 'place', 'gubun', 'org', 'time', 'slot'];
+const DEBOUNCE_MS = 150;
+
+/* =========================================================
+   2. 공통 유틸
+   ========================================================= */
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const fmt = v => Math.round(v).toLocaleString('ko-KR');
+const pct = v => (v * 100).toFixed(1) + '%';
+/** 축 눈금용 짧은 숫자 (만·억 단위) */
+function fmtShort(v) {
+  if (v >= 1e8) return +(v / 1e8).toFixed(1) + '억';
+  if (v >= 1e4) return +(v / 1e4).toFixed(v >= 1e5 ? 0 : 1) + '만';
+  return fmt(v);
+}
+function debounce(fn, ms) { let t; return (...a) => { clearTimeout(t); t = setTimeout(() => fn(...a), ms); }; }
+const tick = () => new Promise(r => setTimeout(r, 0));     // 화면 갱신 기회 주기
+/** 헤더 비교용 정규화 */
+const normHeader = s => String(s ?? '').replace(/[\s·・‧.\-_/]/g, '').toLowerCase();
+/** 엑셀 날짜 일련번호 ↔ 연·월·일 */
+const EXCEL_EPOCH = Date.UTC(1899, 11, 30);
+function serialToDate(s) { return new Date(EXCEL_EPOCH + s * 864e5); }
+function ymdToSerial(y, m, d) { return Math.round((Date.UTC(y, m - 1, d) - EXCEL_EPOCH) / 864e5); }
+function fmtDate(s) {
+  const d = serialToDate(s);
+  return d.getUTCFullYear() + '-' + String(d.getUTCMonth() + 1).padStart(2, '0') + '-' + String(d.getUTCDate()).padStart(2, '0');
+}
+function kindOfLabel(label) { return /전시/.test(label) ? 1 : /공연/.test(label) ? 0 : 2; }
+function shortPlace(p) { return String(p).replace(/^예술의전당\s*/, '') || p; }
+
+/* =========================================================
+   3. 데이터 저장소 (열 단위 TypedArray + 문자열 사전)
+   원본 데이터는 이 객체 하나로 브라우저 메모리에 보관
+   ========================================================= */
+/** 저장소 마무리: 분야 종류, 연도 색인, 정렬용 날짜 키 계산 */
+function finalizeStore(st) {
+  const c = st.c, n = st.n;
+  st.fieldKind = Uint8Array.from(st.dict.field, kindOfLabel);
+  const ys = new Set(); for (let i = 0; i < n; i++) ys.add(c.year[i]);
+  st.years = [...ys].sort((a, b) => a - b);
+  st.yearMin = st.years[0] || 0;
+  st.yearIdx = new Int16Array((st.years[st.years.length - 1] || 0) - st.yearMin + 1);
+  st.years.forEach((y, i) => { st.yearIdx[y - st.yearMin] = i; });
+  // 날짜가 없으면 연·월 1일로 대체한 정렬 키
+  c.dateKey = new Float64Array(n);
+  for (let i = 0; i < n; i++) c.dateKey[i] = c.date[i] || ymdToSerial(c.year[i], c.month[i] || 1, 1);
+  st._rank = {}; st._lower = null;
+  /** 사전 순위(가나다순) – 문자열 열 정렬에 사용 */
+  st.rank = key => {
+    if (st._rank[key]) return st._rank[key];
+    const d = st.dict[key], order = d.map((_, i) => i), col = new Intl.Collator('ko', { numeric: true });
+    order.sort((a, b) => col.compare(d[a], d[b]));
+    const r = new Int32Array(d.length); order.forEach((code, i) => { r[code] = i; });
+    return (st._rank[key] = r);
+  };
+  st.nameLower = () => st._lower || (st._lower = st.dict.name.map(s => s.toLowerCase()));
+  st.label = (key, code) => st.dict[key][code] || '(미기재)';
+  return st;
+}
+
+/** HTML에 내장된 기본 데이터(JSON)로 저장소 생성 */
+function storeFromEmbedded(j) {
+  const toArr = (s, T) => { const a = s.split(','), out = new T(a.length); for (let i = 0; i < a.length; i++) out[i] = +a[i]; return out; };
+  const dict = {}, c = {};
+  for (const k of STR_KEYS) { dict[k] = j.s[k][0]; c[k] = toArr(j.s[k][1], Int32Array); }
+  const v = j.v;
+  c.date = toArr(v.date, Int32Array); c.year = toArr(v.year, Int16Array);
+  c.month = toArr(v.month, Uint8Array); c.dow = toArr(v.dow, Uint8Array);
+  c.free = toArr(v.free, Float64Array); c.paid = toArr(v.paid, Float64Array); c.total = toArr(v.total, Float64Array);
+  const e1 = toArr(v.ex1, Float64Array), e2 = toArr(v.ex2, Float64Array);
+  c.ex = e1.map((x, i) => x + e2[i]);
+  return finalizeStore({ n: j.n, dict, c });
+}
+
+/** 업로드 데이터용 저장소 빌더: 행을 하나씩 추가한 뒤 finish()로 TypedArray 변환 */
+class StoreBuilder {
+  constructor() {
+    this.n = 0; this.dict = {}; this.map = {}; this.cols = {};
+    for (const k of STR_KEYS) { this.dict[k] = []; this.map[k] = new Map(); this.cols[k] = []; }
+    for (const k of ['date', 'year', 'month', 'dow', 'free', 'paid', 'ex', 'total']) this.cols[k] = [];
+  }
+  code(k, v) {
+    v = v == null ? '' : String(v).trim();
+    let c = this.map[k].get(v);
+    if (c === undefined) { c = this.dict[k].length; this.dict[k].push(v); this.map[k].set(v, c); }
+    return c;
+  }
+  add(r) {
+    for (const k of STR_KEYS) this.cols[k].push(this.code(k, r[k]));
+    for (const k of ['date', 'year', 'month', 'dow', 'free', 'paid', 'ex', 'total']) this.cols[k].push(r[k] || 0);
+    this.n++;
+  }
+  finish() {
+    const c = {}, T = { date: Int32Array, year: Int16Array, month: Uint8Array, dow: Uint8Array };
+    for (const k of STR_KEYS) c[k] = Int32Array.from(this.cols[k]);
+    for (const k of ['date', 'year', 'month', 'dow', 'free', 'paid', 'ex', 'total']) c[k] = (T[k] || Float64Array).from(this.cols[k]);
+    return finalizeStore({ n: this.n, dict: this.dict, c });
+  }
+}
+
+/* =========================================================
+   4. 파일 읽기: XLSX(ZIP+XML 직접 해석) / CSV
+   외부 라이브러리·서버 없이 브라우저 내장 기능만 사용
+   ========================================================= */
+/** ZIP 열기: 중앙 디렉터리를 읽어 파일 목록 생성, 필요할 때 압축 해제 */
+function openZip(buf) {
+  const dv = new DataView(buf), u8 = new Uint8Array(buf);
+  let e = buf.byteLength - 22;
+  while (e >= 0 && dv.getUint32(e, true) !== 0x06054b50) e--;
+  if (e < 0) throw new Error('엑셀(xlsx) 형식이 아닙니다. 구버전 .xls는 xlsx 또는 csv로 저장한 뒤 올려 주세요.');
+  const count = dv.getUint16(e + 10, true); let p = dv.getUint32(e + 16, true);
+  const entries = new Map(), td = new TextDecoder('utf-8');
+  for (let i = 0; i < count && dv.getUint32(p, true) === 0x02014b50; i++) {
+    const method = dv.getUint16(p + 10, true), csize = dv.getUint32(p + 20, true);
+    const nlen = dv.getUint16(p + 28, true), xlen = dv.getUint16(p + 30, true), clen = dv.getUint16(p + 32, true);
+    const lho = dv.getUint32(p + 42, true);
+    entries.set(td.decode(u8.subarray(p + 46, p + 46 + nlen)).toLowerCase(), { method, csize, lho });
+    p += 46 + nlen + xlen + clen;
+  }
+  const cache = new Map();
+  async function bytes(name) {
+    name = name.toLowerCase();
+    if (cache.has(name)) return cache.get(name);
+    const en = entries.get(name); if (!en) throw new Error('엑셀 내부 파일이 없습니다: ' + name);
+    const start = en.lho + 30 + dv.getUint16(en.lho + 26, true) + dv.getUint16(en.lho + 28, true);
+    const raw = u8.subarray(start, start + en.csize);
+    let out;
+    if (en.method === 0) out = raw;
+    else if (en.method === 8) {
+      if (typeof DecompressionStream === 'undefined') throw new Error('이 브라우저는 압축 해제를 지원하지 않습니다. 최신 Chrome·Edge·Firefox를 사용하거나 CSV로 올려 주세요.');
+      const stream = new Blob([raw]).stream().pipeThrough(new DecompressionStream('deflate-raw'));
+      out = new Uint8Array(await new Response(stream).arrayBuffer());
+    } else throw new Error('지원하지 않는 압축 방식입니다.');
+    cache.set(name, out); return out;
+  }
+  return { has: n => entries.has(n.toLowerCase()), bytes, text: async n => td.decode(await bytes(n)) };
+}
+
+const XML_ENT = { amp: '&', lt: '<', gt: '>', quot: '"', apos: "'" };
+const decodeXml = s => s.indexOf('&') < 0 ? s : s.replace(/&(#x[0-9a-f]+|#\d+|\w+);/gi, (m, e) =>
+  e[0] === '#' ? String.fromCodePoint(e[1] === 'x' || e[1] === 'X' ? parseInt(e.slice(2), 16) : +e.slice(1)) : (XML_ENT[e] ?? m));
+const getAttr = (a, name) => { const m = new RegExp('(?:^|\\s)' + name + '="([^"]*)"').exec(a); return m ? m[1] : ''; };
+/** 셀 안의 <t> 텍스트 모으기(서식 run 포함, 발음 표기 제외) */
+function collectText(xml) {
+  xml = xml.replace(/<rPh\b[\s\S]*?<\/rPh>/g, '');
+  let out = '', m; const re = /<t\b[^>]*>([\s\S]*?)<\/t>/g;
+  while ((m = re.exec(xml))) out += m[1];
+  return decodeXml(out);
+}
+function colIndex(letters) { let n = 0; for (let i = 0; i < letters.length; i++) n = n * 26 + letters.charCodeAt(i) - 64; return n - 1; }
+
+/** 시트 XML → 2차원 배열(행 단위). limit이 있으면 앞쪽 행만 */
+function parseSheetRows(xml, sst, limit) {
+  const rows = [], rowRe = /<row\b[^>]*?(?:\/>|>([\s\S]*?)<\/row>)/g, cellRe = /<c\b([^>]*?)(?:\/>|>([\s\S]*?)<\/c>)/g;
+  let m;
+  while ((m = rowRe.exec(xml))) {
+    const row = [], inner = m[1];
+    if (inner) {
+      cellRe.lastIndex = 0; let c, auto = 0;
+      while ((c = cellRe.exec(inner))) {
+        const a = c[1], ref = /\br="([A-Z]+)/.exec(a), col = ref ? colIndex(ref[1]) : auto; auto = col + 1;
+        const t = (/\bt="(\w+)"/.exec(a) || [])[1], body = c[2] || '';
+        let v = '';
+        if (t === 'inlineStr') v = collectText(body);
+        else {
+          const vm = /<v>([\s\S]*?)<\/v>/.exec(body);
+          if (vm) v = t === 's' ? (sst[+vm[1]] ?? '') : (t === 'str' || t === 'e') ? decodeXml(vm[1]) : t === 'b' ? (vm[1] === '1' ? 'TRUE' : 'FALSE') : +vm[1];
+        }
+        row[col] = v;
+      }
+    }
+    rows.push(row);
+    if (limit && rows.length >= limit) break;
+  }
+  return rows;
+}
+
+/** XLSX 파일 → { sheets: [{name, path}], rows(sheet, limit) } */
+async function readXlsx(buf) {
+  const zip = openZip(buf);
+  const wb = await zip.text('xl/workbook.xml');
+  const relsXml = zip.has('xl/_rels/workbook.xml.rels') ? await zip.text('xl/_rels/workbook.xml.rels') : '';
+  const rels = {};
+  relsXml.replace(/<Relationship\b([^>]*)>/g, (m, a) => { rels[getAttr(a, 'Id')] = getAttr(a, 'Target'); });
+  const sheets = [];
+  wb.replace(/<sheet\b([^>]*)>/g, (m, a) => {
+    let t = rels[getAttr(a, 'r:id')] || '';
+    t = t.startsWith('/') ? t.slice(1) : 'xl/' + t.replace(/^\.\//, '');
+    sheets.push({ name: decodeXml(getAttr(a, 'name')), path: t });
+  });
+  let sst = [];
+  if (zip.has('xl/sharedStrings.xml')) {
+    const x = await zip.text('xl/sharedStrings.xml'), re = /<si>([\s\S]*?)<\/si>/g; let m;
+    while ((m = re.exec(x))) sst.push(collectText(m[1]));
+  }
+  const td = new TextDecoder('utf-8');
+  return {
+    sheets,
+    async rows(sheet, limit) {
+      const b = await zip.bytes(sheet.path);
+      // 미리보기는 앞부분만 해석해 빠르게
+      const xml = limit ? td.decode(b.subarray(0, Math.min(b.length, 1500000))) : td.decode(b);
+      return parseSheetRows(xml, sst, limit);
+    }
+  };
+}
+
+/** CSV 텍스트 → 2차원 배열 (따옴표·구분자 자동 감지: 쉼표/탭/세미콜론) */
+function parseCSV(text) {
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const firstLine = (text.slice(0, 10000).split(/\r?\n/).find(l => l.trim()) || '');
+  let d = ',', best = 0;
+  for (const c of [',', '\t', ';']) { const k = firstLine.split(c).length; if (k > best) { best = k; d = c; } }
+  const rows = []; let row = [], field = '', i = 0, q = false; const n = text.length;
+  while (i < n) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"') { if (text[i + 1] === '"') { field += '"'; i += 2; continue; } q = false; i++; continue; }
+      const j = text.indexOf('"', i); if (j < 0) { field += text.slice(i); break; }
+      field += text.slice(i, j); i = j; continue;
+    }
+    if (ch === '"' && field === '') { q = true; i++; continue; }
+    if (ch === d) { row.push(field); field = ''; i++; continue; }
+    if (ch === '\n' || ch === '\r') { row.push(field); field = ''; rows.push(row); row = []; if (ch === '\r' && text[i + 1] === '\n') i++; i++; continue; }
+    field += ch; i++;
+  }
+  if (field !== '' || row.length) { row.push(field); rows.push(row); }
+  return rows;
+}
+/** CSV 바이트 디코딩: UTF-8 실패 시 EUC-KR(CP949)로 재시도 */
+function decodeCsv(buf) {
+  try { return new TextDecoder('utf-8', { fatal: true }).decode(buf); }
+  catch (e) { return new TextDecoder('euc-kr').decode(buf); }
+}
+
+/* =========================================================
+   5. 헤더 인식·시트 자동 선택·값 변환
+   ========================================================= */
+/** 정규화된 별칭 → {key, prio} 조회표 */
+const ALIAS = new Map();
+for (const [key, list] of Object.entries(COLUMN_MAP)) list.forEach((a, prio) => {
+  const k = normHeader(a); if (!ALIAS.has(k)) ALIAS.set(k, { key, prio });
+});
+const cellStr = v => v == null ? '' : String(v).trim();
+
+/**
+ * 헤더 행 찾기: 앞쪽 15행에서 1행 헤더와 2행(다중) 헤더를 모두 시도해
+ * 가장 많은 컬럼이 매핑되는 위치를 고른다.
+ * 다중 헤더는 위 행의 병합 셀을 오른쪽으로 채운 뒤 "위+아래", "아래", "위" 순으로 비교.
+ */
+function detectHeader(rows) {
+  let best = null;
+  const lim = Math.min(15, rows.length);
+  for (let r = 0; r < lim; r++) {
+    for (const depth of [1, 2]) {
+      if (depth === 2 && r + 1 >= rows.length) continue;
+      const up = rows[r] || [], low = rows[r + depth - 1] || [];
+      const width = Math.max(up.length, low.length);
+      const map = {};
+      let carry = '';
+      for (let c = 0; c < width; c++) {
+        let cands;
+        if (depth === 1) cands = [cellStr(up[c])];
+        else {
+          const u0 = cellStr(up[c]), l = cellStr(low[c]);
+          if (u0) carry = u0;
+          const u = u0 || (l ? carry : '');            // 병합된 위 셀은 오른쪽으로 채움
+          cands = l ? [u + l, l] : [u0];
+        }
+        for (const cand of cands) {
+          const hit = cand && ALIAS.get(normHeader(cand));
+          if (hit) { if (!map[hit.key] || hit.prio < map[hit.key].prio) map[hit.key] = { col: c, prio: hit.prio }; break; }
+        }
+      }
+      const keys = Object.keys(map).length;
+      const missing = REQUIRED_RULES.filter(rule => !rule.ok(map)).map(rule => rule.label);
+      const score = keys + (missing.length ? 0 : 100);
+      if (!best || score > best.score) best = { score, row: r, depth, map, missing, keys };
+    }
+  }
+  return best || { score: 0, row: 0, depth: 1, map: {}, missing: REQUIRED_RULES.map(r => r.label), keys: 0 };
+}
+
+/** 숫자 변환: 쉼표·공백·'명' 제거, 빈값·'-'은 0, 해석 불가는 NaN */
+function toNum(v) {
+  if (typeof v === 'number') return v;
+  const s = cellStr(v).replace(/[,\s명]/g, '');
+  if (s === '' || s === '-') return 0;
+  const n = Number(s); return isFinite(n) ? n : NaN;
+}
+/** 날짜 변환 → 엑셀 일련번호 (일련번호·YYYYMMDD·'2025-01-31'·'2025.1.31'·'2025년 1월 31일' 지원) */
+function toSerial(v) {
+  if (v == null || v === '') return 0;
+  if (typeof v === 'string' && /^\d+(\.\d+)?$/.test(v.trim())) v = +v;
+  if (typeof v === 'number') {
+    if (v >= 19000101 && v <= 29991231) return ymdToSerial(Math.floor(v / 1e4), Math.floor(v / 100) % 100, v % 100);
+    return v > 59 && v < 2958465 ? Math.floor(v) : 0;
+  }
+  const m = /(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*[.\-/월]\s*(\d{1,2})/.exec(v);
+  return m ? ymdToSerial(+m[1], +m[2], +m[3]) : 0;
+}
+/** 시간 변환 → 'HH:MM' (1400, 0.8125, '19:30', '19시 30분' 지원) */
+function toTime(v) {
+  if (v == null || v === '') return '';
+  let h, mi;
+  if (typeof v === 'string' && /^\d+(\.\d+)?$/.test(v.trim())) v = +v;
+  if (typeof v === 'number') {
+    if (v < 1 || (v % 1 !== 0 && v < 100)) { const t = Math.round((v % 1) * 1440); h = Math.floor(t / 60); mi = t % 60; }
+    else { h = Math.floor(v / 100); mi = v % 100; }
+  } else {
+    const m = /(\d{1,2})\s*[:시]\s*(\d{1,2})?/.exec(v);
+    if (!m) return String(v).trim();
+    h = +m[1]; mi = +(m[2] || 0);
+    if (/오후|PM/i.test(v) && h < 12) h += 12;
+  }
+  return String(h % 24).padStart(2, '0') + ':' + String(mi).padStart(2, '0');
+}
+/** 시간대가 없는 파일용: 시간으로 시간대 계산 */
+function slotOf(t) {
+  const h = parseInt(t, 10); if (isNaN(h)) return '';
+  return h < 6 ? '심야' : h < 12 ? '오전' : h < 17 ? '오후' : '저녁';
+}
+
+/** 헤더 아래 행들을 저장소로 변환 */
+function buildStoreFromRows(rows, header, sheetName) {
+  const map = header.map, col = k => map[k] ? map[k].col : -1;
+  const ci = {}; for (const k of Object.keys(COLUMN_MAP)) ci[k] = col(k);
+  const get = (row, k) => ci[k] >= 0 ? row[ci[k]] : undefined;
+  const fieldHint = /전시/.test(sheetName) ? '전시' : /공연/.test(sheetName) ? '공연' : '';
+  const b = new StoreBuilder(); let skipped = 0, badNum = 0;
+  for (let r = header.row + header.depth; r < rows.length; r++) {
+    const row = rows[r]; if (!row || !row.length) continue;
+    const name = cellStr(get(row, 'name')), place = cellStr(get(row, 'place'));
+    const totalRaw = get(row, 'total');
+    if (!name && !place && (totalRaw == null || totalRaw === '')) continue;         // 빈 행
+    if (/^(합계|총계|소계|계)$/.test(name) || /^(합계|총계|소계|계)$/.test(place)) { skipped++; continue; } // 합계 행
+    const date = ci.date >= 0 ? toSerial(get(row, 'date')) : 0;
+    const d = date ? serialToDate(date) : null;
+    const year = toNum(get(row, 'year')) || (d ? d.getUTCFullYear() : 0);
+    if (!year) { skipped++; continue; }
+    const month = toNum(get(row, 'month')) || (d ? d.getUTCMonth() + 1 : 0);
+    let dow = toNum(get(row, 'dow'));
+    if (!dow && ci.dowText >= 0) dow = DOW_LABELS.indexOf(cellStr(get(row, 'dowText')).charAt(0)) + 1;
+    if (!dow && d) dow = ((d.getUTCDay() + 6) % 7) + 1;             // 월=1 … 일=7
+    let free = toNum(get(row, 'free')), paid = toNum(get(row, 'paid'));
+    let ex = toNum(get(row, 'ex1')) + toNum(get(row, 'ex2'));
+    let total = ci.total >= 0 ? toNum(totalRaw) : free + paid + ex;
+    if (isNaN(free)) { free = 0; badNum++; } if (isNaN(paid)) { paid = 0; badNum++; } if (isNaN(ex)) ex = 0;
+    if (isNaN(total)) { total = 0; badNum++; }
+    const time = toTime(get(row, 'time'));
+    b.add({
+      field: ci.field >= 0 ? cellStr(get(row, 'field')) : (fieldHint || (/미술관|박물관|갤러리/.test(place) ? '전시' : '공연')),
+      name, place, gubun: cellStr(get(row, 'gubun')), org: cellStr(get(row, 'org')),
+      time, slot: ci.slot >= 0 ? cellStr(get(row, 'slot')) : slotOf(time),
+      date, year, month, dow, free, paid, ex, total
+    });
+  }
+  return { store: b.finish(), skipped, badNum };
+}
+
+/** 업로드 파일 전체 처리: 시트 검사 → 분석 시트 선택 → 헤더 인식 → 검증 → 저장소 생성 */
+async function loadFile(file) {
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+  if (ext === 'xls') throw new Error('구버전 .xls 파일은 지원하지 않습니다. 엑셀에서 .xlsx 또는 .csv로 저장한 뒤 올려 주세요.');
+  setLoading('파일을 읽는 중…'); await tick();
+  const buf = await file.arrayBuffer();
+  let candidates = [];   // { name, header, getRows }
+  if (ext === 'csv' || ext === 'txt' || ext === 'tsv') {
+    const rows = parseCSV(decodeCsv(buf));
+    candidates.push({ name: file.name.replace(/\.[^.]+$/, ''), header: detectHeader(rows), getRows: async () => rows });
+  } else {
+    const x = await readXlsx(buf);
+    if (!x.sheets.length) throw new Error('시트를 찾을 수 없습니다.');
+    for (const s of x.sheets) {
+      setLoading(`시트 검사 중: ${s.name}`); await tick();
+      const head = await x.rows(s, 20);
+      candidates.push({ name: s.name, header: detectHeader(head), getRows: () => x.rows(s, 0) });
+    }
+  }
+  // 필수 컬럼을 갖춘 시트 중 매핑 컬럼이 가장 많은 시트, 동점이면 이름에 '분석'이 있는 시트
+  candidates.sort((a, b) => (b.header.score - a.header.score) || (/분석/.test(b.name) - /분석/.test(a.name)));
+  const pick = candidates[0];
+  if (pick.header.missing.length) {
+    throw new Error(`분석에 필요한 컬럼을 찾지 못했습니다. 없는 컬럼: ${pick.header.missing.join(', ')} ` +
+      `(검사한 시트: ${candidates.map(c => c.name).join(', ')})`);
+  }
+  setLoading(`'${pick.name}' 시트 데이터를 해석하는 중…`); await tick();
+  const rows = await pick.getRows();
+  setLoading('집계를 준비하는 중…'); await tick();
+  const res = buildStoreFromRows(rows, pick.header, pick.name);
+  if (!res.store.n) throw new Error('데이터 행이 없습니다. 헤더 아래에 데이터가 있는지 확인해 주세요.');
+  return { ...res, sheet: pick.name, header: pick.header };
+}
+
+/* =========================================================
+   6. 상태 · 필터 · 단일 패스 집계
+   ========================================================= */
+const S = {
+  store: null, defaultStore: null, isDefault: true,
+  source: { file: '', sheet: '' },
+  filter: { year: '', field: '', place: '', gubun: '' },
+  agg: null,
+  table: { q: '', sortKey: null, dir: 1, page: 1, size: 20, rows: new Int32Array(0) }
+};
+
+/**
+ * 필터링과 모든 집계를 한 번의 반복으로 처리.
+ * 결과: 필터된 행 번호, KPI 합계, 연도·장소·월·요일·시간대·작품별 합계
+ */
+function computeAll() {
+  const st = S.store, c = st.c, n = st.n, f = S.filter;
+  const fy = f.year === '' ? -1 : +f.year, ff = f.field === '' ? -1 : +f.field;
+  const fp = f.place === '' ? -1 : +f.place, fg = f.gubun === '' ? -1 : +f.gubun;
+  const Y = st.years.length, P = st.dict.place.length, NN = st.dict.name.length, SL = st.dict.slot.length;
+  const A = {
+    idx: new Int32Array(n), k: 0, total: 0, paid: 0, rows: [0, 0, 0], sum: [0, 0, 0],
+    year: new Float64Array(Y * 3), yearCnt: new Float64Array(Y * 3),
+    place: new Float64Array(P * 3), placeCnt: new Float64Array(P),
+    month: new Float64Array(13 * 3), monthCnt: new Float64Array(13 * 3),
+    dow: new Float64Array(8 * 3), dowCnt: new Float64Array(8 * 3),
+    slot: new Float64Array(SL), slotCnt: new Float64Array(SL),
+    name: new Float64Array(NN * 3), nameCnt: new Int32Array(NN)
+  };
+  const { year, field, place, gubun, month, dow, slot, name, total, paid } = c;
+  const kindOf = st.fieldKind, yIdx = st.yearIdx, y0 = st.yearMin;
+  let k = 0;
+  for (let i = 0; i < n; i++) {
+    if (fy >= 0 && year[i] !== fy) continue;
+    if (ff >= 0 && field[i] !== ff) continue;
+    if (fp >= 0 && place[i] !== fp) continue;
+    if (fg >= 0 && gubun[i] !== fg) continue;
+    A.idx[k++] = i;
+    const v = total[i], kd = kindOf[field[i]];
+    A.total += v; A.paid += paid[i]; A.rows[kd]++; A.sum[kd] += v;
+    const yi = yIdx[year[i] - y0] * 3 + kd; A.year[yi] += v; A.yearCnt[yi]++;
+    A.place[place[i] * 3 + kd] += v; A.placeCnt[place[i]]++;
+    const mo = month[i]; if (mo >= 1 && mo <= 12) { A.month[mo * 3 + kd] += v; A.monthCnt[mo * 3 + kd]++; }
+    const d = dow[i]; if (d >= 1 && d <= 7) { A.dow[d * 3 + kd] += v; A.dowCnt[d * 3 + kd]++; }
+    if (kd === 0) { A.slot[slot[i]] += v; A.slotCnt[slot[i]]++; }
+    A.name[name[i] * 3 + kd] += v; A.nameCnt[name[i]]++;
+  }
+  A.k = k; A.idx = A.idx.slice(0, k);
+  return A;
+}
+
+/** 필터 옵션 다시 만들기 (데이터 교체 시) */
+function buildFilterOptions() {
+  const st = S.store;
+  const opts = (key) => st.dict[key].map((v, i) => [i, v || '(미기재)']).sort((a, b) => a[1].localeCompare(b[1], 'ko'));
+  const fill = (el, list) => { el.innerHTML = '<option value="">전체</option>' + list.map(([v, t]) => `<option value="${v}">${esc(t)}</option>`).join(''); };
+  fill($('fYear'), st.years.slice().reverse().map(y => [y, y + '년']));
+  fill($('fField'), opts('field'));
+  fill($('fPlace'), opts('place'));
+  fill($('fGubun'), opts('gubun'));
+  S.filter = { year: '', field: '', place: '', gubun: '' };
+}
+
+/** 필터 변경 → 집계 → 모든 화면 요소 갱신 */
+function refresh() {
+  S.agg = computeAll();
+  renderKPIs(); renderCharts(); renderTop10(); renderNotice();
+  rebuildTable(true);
+}
+const refreshDebounced = debounce(refresh, DEBOUNCE_MS);
+
+/* =========================================================
+   7. 화면 그리기: 출처·안내·KPI
+   ========================================================= */
+function renderSource() {
+  $('sourceInfo').innerHTML = `파일 <b>${esc(S.source.file)}</b> · 시트 <b>${esc(S.source.sheet)}</b> · <b class="num">${fmt(S.store.n)}</b>건` +
+    `<span class="tag">${S.isDefault ? '기본 데이터' : '업로드 데이터'}</span>`;
+  $('btnRestore').disabled = S.isDefault;
+}
+/** 전시 수록 시작 연도 안내 (데이터에서 계산) */
+function renderNotice() {
+  const st = S.store, c = st.c; let first = 0;
+  for (let i = 0; i < st.n; i++) if (st.fieldKind[c.field[i]] === 1 && (!first || c.year[i] < first)) first = c.year[i];
+  const txt = first && first > st.yearMin
+    ? `전시 데이터는 ${first}년부터만 있습니다. 그 이전 연도는 공연 데이터만 수록되어 있어, 연도별 비교 시 유의해 주세요.`
+    : '';
+  $('exhNotice').textContent = txt; $('exhNotice').style.display = txt ? '' : 'none';
+  $('footYear').textContent = txt ? `※ 전시는 ${first}년부터 집계됩니다.` : '';
+  // 인쇄용 필터 요약
+  const f = S.filter, lab = (key, v) => v === '' ? '전체' : S.store.label(key, +v);
+  $('printFilters').textContent = `적용 필터 — 연도: ${f.year === '' ? '전체' : f.year + '년'} · 분야: ${lab('field', f.field)} · 장소: ${lab('place', f.place)} · 구분: ${lab('gubun', f.gubun)}`;
+}
+function renderKPIs() {
+  const A = S.agg, st = S.store, rows = A.k;
+  let bestP = -1, bestV = 0;
+  for (let p = 0; p < st.dict.place.length; p++) { const v = A.place[p * 3] + A.place[p * 3 + 1] + A.place[p * 3 + 2]; if (v > bestV) { bestV = v; bestP = p; } }
+  const avg = (s, n) => n ? fmt(s / n) : '-';
+  const tiles = [
+    { l: '총 입장객', v: rows ? fmt(A.total) + '<small>명</small>' : '-',
+      s: `<span class="dot perf"></span>공연 ${fmt(A.sum[0])} · <span class="dot exh"></span>전시 ${fmt(A.sum[1])}` },
+    { l: '공연·전시 회차(행) 수', v: fmt(rows) + '<small>건</small>',
+      s: `<span class="dot perf"></span>공연 ${fmt(A.rows[0])}회 · <span class="dot exh"></span>전시 ${fmt(A.rows[1])}일` },
+    { l: '회차당 평균 입장객', v: rows ? fmt(A.total / rows) + '<small>명</small>' : '-',
+      s: `공연 회당 ${avg(A.sum[0], A.rows[0])} · 전시 일당 ${avg(A.sum[1], A.rows[1])}` },
+    { l: '유료 관객 비율', v: A.total ? pct(A.paid / A.total) : '-',
+      s: `유료 ${fmt(A.paid)}명 / 전체 ${fmt(A.total)}명` },
+    { l: '입장객 최다 장소', v: bestP >= 0 ? esc(shortPlace(st.label('place', bestP))) : '-', text: true,
+      s: bestP >= 0 ? `${fmt(bestV)}명 · 전체의 ${pct(bestV / A.total)}` : '' }
+  ];
+  $('kpis').innerHTML = tiles.map(t => `<div class="kpi"><div class="kpi-label">${t.l}</div>` +
+    `<div class="kpi-value${t.text ? ' text' : ''}" title="${t.text ? esc(st.label('place', bestP)) : ''}">${t.v}</div><div class="kpi-sub">${t.s}</div></div>`).join('');
+}
+
+/* =========================================================
+   8. 차트 (SVG 직접 생성, 외부 라이브러리 없음)
+   ========================================================= */
+/** 보기 좋은 축 눈금 계산 */
+function niceTicks(max, count = 4) {
+  if (max <= 0) return { top: 1, ticks: [0, 1] };
+  const raw = max / count, mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map(s => s * mag).find(s => s >= raw);
+  const top = Math.ceil(max / step) * step, ticks = [];
+  for (let v = 0; v <= top + 1e-9; v += step) ticks.push(v);
+  return { top, ticks };
+}
+/** 위쪽 모서리만 둥근 막대 경로 */
+function topRounded(x, y, w, h, r) {
+  r = Math.min(r, w / 2, h); if (h <= 0) return '';
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+/** 툴팁 HTML 만들기 */
+function tipHtml(title, rows) {
+  return `<div class="t">${esc(title)}</div>` + rows.map(([k, v, color]) =>
+    `<div class="r"><span>${color ? `<span class="dot" style="background:${color}"></span>` : ''}${esc(k)}</span><b>${esc(v)}</b></div>`).join('');
+}
+
+/**
+ * 세로 막대 차트
+ * @param el 그릴 요소  @param cats 범주 라벨  @param series [{label,color,values}]
+ * @param opt { stacked, tip(i) → 툴팁 HTML, height }
+ */
+function columnChart(el, cats, series, opt = {}) {
+  const W = Math.max(300, Math.round(el.clientWidth || 560)), H = opt.height || 220;
+  const m = { l: 46, r: 6, t: 10, b: 24 }, iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const totals = cats.map((_, i) => series.reduce((s, se) => s + se.values[i], 0));
+  const max = opt.stacked ? Math.max(0, ...totals) : Math.max(0, ...series.flatMap(se => Array.from(se.values)));
+  if (!max) { el.innerHTML = '<div class="empty">선택한 조건에 해당하는 데이터가 없습니다.</div>'; return; }
+  const { top, ticks } = niceTicks(max), ys = v => m.t + ih - (v / top) * ih;
+  const band = iw / cats.length, bw = Math.min(band * 0.72, 56);
+  let g = '';
+  for (const t of ticks) g += `<line x1="${m.l}" x2="${W - m.r}" y1="${ys(t)}" y2="${ys(t)}" stroke="#E4E6EA" stroke-width="1"/>` +
+    `<text x="${m.l - 6}" y="${ys(t) + 4}" text-anchor="end">${fmtShort(t)}</text>`;
+  const every = band < 26 ? 2 : 1;
+  cats.forEach((cat, i) => {
+    const cx = m.l + band * i + band / 2, x0 = cx - bw / 2;
+    if (opt.stacked) {
+      let acc = 0; const live = series.filter(se => se.values[i] > 0);
+      live.forEach((se, j) => {
+        const v = se.values[i], y1 = ys(acc + v), y2 = ys(acc), isTop = j === live.length - 1;
+        const h = Math.max(0, y2 - y1 - (j > 0 ? 2 : 0));     // 2px 간격
+        g += isTop ? `<path d="${topRounded(x0, y1, bw, h, 4)}" fill="${se.color}"/>` : `<rect x="${x0}" y="${y1}" width="${bw}" height="${h}" fill="${se.color}"/>`;
+        acc += v;
+      });
+    } else {
+      const k = series.length, sw = (bw - 2 * (k - 1)) / k;
+      series.forEach((se, j) => {
+        const v = se.values[i]; if (!v) return;
+        const y1 = ys(v); g += `<path d="${topRounded(x0 + j * (sw + 2), y1, sw, m.t + ih - y1, 4)}" fill="${se.color}"/>`;
+      });
+    }
+    if (i % every === 0) g += `<text x="${cx}" y="${H - 6}" text-anchor="middle">${esc(cat)}</text>`;
+    g += `<rect x="${m.l + band * i}" y="${m.t}" width="${band}" height="${ih}" fill="transparent" data-tip="${esc(opt.tip ? opt.tip(i) : '')}"/>`;
+  });
+  g += `<line x1="${m.l}" x2="${W - m.r}" y1="${m.t + ih}" y2="${m.t + ih}" stroke="#C9CDD2"/>`;
+  el.innerHTML = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opt.label || '')}">${g}</svg>`;
+}
+
+/** 집계 배열(범주×3 분야)에서 공연·전시(·기타) 계열 만들기. at(i) = i번째 범주의 집계 색인 */
+function seriesFor(arr, len, at) {
+  const p = new Float64Array(len), e = new Float64Array(len), o = new Float64Array(len);
+  for (let i = 0; i < len; i++) { const b = at(i) * 3; p[i] = arr[b]; e[i] = arr[b + 1]; o[i] = arr[b + 2]; }
+  const s = [{ label: KIND[0].label, color: KIND[0].color, values: p }, { label: KIND[1].label, color: KIND[1].color, values: e }];
+  if (o.some(v => v > 0)) s.push({ label: KIND[2].label, color: KIND[2].color, values: o });
+  return s;
+}
+/** 툴팁: 범주 하나의 분야별 합계와 평균 */
+function kindTip(title, arr, cnt, b) {
+  const rows = []; let sum = 0;
+  for (let k = 0; k < 3; k++) {
+    if (!cnt[b + k]) continue; sum += arr[b + k];
+    rows.push([`${KIND[k].label}`, `${fmt(arr[b + k])}명 (${k === 1 ? '일당' : '회당'} ${fmt(arr[b + k] / cnt[b + k])})`, KIND[k].color]);
+  }
+  if (rows.length > 1) rows.push(['합계', fmt(sum) + '명']);
+  return tipHtml(title, rows.length ? rows : [['입장객', '0명']]);
+}
+
+function renderCharts() {
+  const A = S.agg, st = S.store;
+  // 연도별 추이 (누적 막대)
+  const years = st.years.filter(y => S.filter.year === '' || y === +S.filter.year);
+  const yi = i => st.yearIdx[years[i] - st.yearMin];
+  columnChart($('chYear'), years.map(y => years.length > 10 && $('chYear').clientWidth < 520 ? "'" + String(y).slice(2) : String(y)),
+    seriesFor(A.year, years.length, yi), { stacked: true, label: '연도별 입장객', tip: i => kindTip(years[i] + '년', A.year, A.yearCnt, yi(i) * 3) });
+  // 월별 (묶은 막대)
+  const months = Array.from({ length: 12 }, (_, i) => i + 1);
+  columnChart($('chMonth'), months.map(mo => mo + '월'), seriesFor(A.month, 12, i => i + 1).filter(s => s.values.some(v => v)),
+    { label: '월별 입장객', tip: i => kindTip((i + 1) + '월', A.month, A.monthCnt, (i + 1) * 3) });
+  // 요일별 (묶은 막대)
+  columnChart($('chDow'), DOW_LABELS, seriesFor(A.dow, 7, i => i + 1).filter(s => s.values.some(v => v)),
+    { label: '요일별 입장객', tip: i => kindTip(DOW_LABELS[i] + '요일', A.dow, A.dowCnt, (i + 1) * 3) });
+  // 공연 시간대별 (단일 계열)
+  const slots = st.dict.slot.map((s, i) => ({ s, i })).filter(o => A.slotCnt[o.i] > 0)
+    .sort((a, b) => (SLOT_ORDER.indexOf(a.s) + 1 || 99) - (SLOT_ORDER.indexOf(b.s) + 1 || 99));
+  columnChart($('chSlot'), slots.map(o => o.s || '(미기재)'), [{ label: '공연', color: KIND[0].color, values: slots.map(o => A.slot[o.i]) }],
+    { label: '공연 시간대별 입장객', tip: j => { const o = slots[j]; return tipHtml(o.s || '(미기재)', [['입장객', fmt(A.slot[o.i]) + '명'], ['회차', fmt(A.slotCnt[o.i]) + '회'], ['회당 평균', fmt(A.slot[o.i] / A.slotCnt[o.i]) + '명']]); } });
+  const midnight = st.dict.slot.indexOf('심야');
+  $('footSlot').textContent = midnight >= 0 && A.slotCnt[midnight] ? '※ 심야(00:00)는 원본에 시작 시각이 00:00으로 기록된 회차로, 시간 미기재일 수 있습니다.' : '';
+  renderPlaces();
+  drawLegends();
+}
+
+/** 장소별 비교 (HTML 가로 누적 막대) */
+function renderPlaces() {
+  const A = S.agg, st = S.store, list = [];
+  for (let p = 0; p < st.dict.place.length; p++) {
+    const v = [A.place[p * 3], A.place[p * 3 + 1], A.place[p * 3 + 2]], s = v[0] + v[1] + v[2];
+    if (A.placeCnt[p]) list.push({ p, v, s });
+  }
+  list.sort((a, b) => b.s - a.s);
+  if (!list.length || !list[0].s) { $('chPlace').innerHTML = '<div class="empty">선택한 조건에 해당하는 데이터가 없습니다.</div>'; return; }
+  const max = list[0].s;
+  $('chPlace').innerHTML = '<div class="hbars">' + list.map(o => {
+    const nm = st.label('place', o.p);
+    const tip = tipHtml(nm, [...o.v.map((x, k) => x ? [KIND[k].label, fmt(x) + '명', KIND[k].color] : null).filter(Boolean), ['합계', fmt(o.s) + '명'], ['건수', fmt(A.placeCnt[o.p]) + '건']]);
+    const segs = o.v.map((x, k) => x ? `<span class="seg" style="width:${(x / max * 100).toFixed(2)}%;background:${KIND[k].color}"></span>` : '').join('');
+    return `<span class="lab" title="${esc(nm)}">${esc(shortPlace(nm))}</span><span class="track" data-tip="${esc(tip)}">${segs}</span><span class="val">${fmtShort(o.s)}</span>`;
+  }).join('') + '</div>';
+}
+
+/** 공연·전시명 TOP10 (합계 기준, 색은 비중이 큰 분야) */
+function renderTop10() {
+  const A = S.agg, st = S.store, NN = st.dict.name.length, top = [];
+  for (let j = 0; j < NN; j++) {
+    const s = A.name[j * 3] + A.name[j * 3 + 1] + A.name[j * 3 + 2];
+    if (s <= 0 || (top.length === 10 && s <= top[9].s)) continue;
+    let pos = top.length; while (pos > 0 && top[pos - 1].s < s) pos--;
+    top.splice(pos, 0, { j, s }); if (top.length > 10) top.pop();
+  }
+  if (!top.length) { $('top10').innerHTML = '<div class="empty">선택한 조건에 해당하는 데이터가 없습니다.</div>'; return; }
+  const max = top[0].s;
+  $('top10').innerHTML = '<div class="hbars top10">' + top.map((o, r) => {
+    const v = [0, 1, 2].map(k => A.name[o.j * 3 + k]), kd = v.indexOf(Math.max(...v)), nm = st.label('name', o.j);
+    const tip = tipHtml(nm, [['분야', KIND[kd].label, KIND[kd].color], ['입장객', fmt(o.s) + '명'], ['회차(행)', fmt(A.nameCnt[o.j]) + '건'], ['회당 평균', fmt(o.s / A.nameCnt[o.j]) + '명']]);
+    return `<span class="lab"><span class="rank">${r + 1}</span><span class="nm" title="${esc(nm)}">${esc(nm)}</span></span>` +
+      `<span class="track" data-tip="${esc(tip)}"><span class="seg" style="width:${(o.s / max * 100).toFixed(2)}%;background:${KIND[kd].color}"></span></span>` +
+      `<span class="val">${fmt(o.s)}</span>`;
+  }).join('') + '</div>';
+}
+
+/** 범례: 데이터에 실제 있는 분야만 표시 */
+function drawLegends() {
+  const A = S.agg, html = KIND.filter((k, i) => A.rows[i] > 0).map(k => `<span><i style="background:${k.color}"></i>${k.label}</span>`).join('');
+  document.querySelectorAll('[data-legend]').forEach(el => { el.innerHTML = html; });
+}
+
+/* =========================================================
+   9. 상세 표: 검색 · 정렬 · 페이징 · 인쇄용 전체 출력
+   ========================================================= */
+const TABLE_COLS = [
+  { key: 'date', label: '일자', type: 'date' },
+  { key: 'field', label: '분야', type: 'str' },
+  { key: 'name', label: '공연·전시명', type: 'str', cls: 'nm' },
+  { key: 'place', label: '장소', type: 'str', cls: 'wrap' },
+  { key: 'gubun', label: '구분', type: 'str' },
+  { key: 'org', label: '주최·기획사', type: 'str', cls: 'wrap' },
+  { key: 'time', label: '시간', type: 'str' },
+  { key: 'free', label: '무료', type: 'num' },
+  { key: 'paid', label: '유료', type: 'num' },
+  { key: 'total', label: '관객수', type: 'num' }
+];
+function renderTableHead() {
+  const t = S.table;
+  const html = '<tr>' + TABLE_COLS.map(col => {
+    const arrow = t.sortKey === col.key ? (t.dir > 0 ? '▲' : '▼') : '↕';
+    return `<th class="sortable${col.type === 'num' ? ' n' : ''}" data-key="${col.key}" aria-sort="${t.sortKey === col.key ? (t.dir > 0 ? 'ascending' : 'descending') : 'none'}">${col.label}<span class="arrow">${arrow}</span></th>`;
+  }).join('') + '</tr>';
+  $('tbl').tHead.innerHTML = html;
+}
+/** 정렬 비교 함수 (문자열은 미리 계산한 가나다 순위로 비교해 빠르게) */
+function makeComparator(st, key, dir) {
+  const c = st.c, col = TABLE_COLS.find(x => x.key === key);
+  if (col.type === 'num') { const a = c[key]; return (x, y) => (a[x] - a[y]) * dir || x - y; }
+  if (col.type === 'date') { const a = c.dateKey, tr = st.rank('time'), t = c.time; return (x, y) => ((a[x] - a[y]) || (tr[t[x]] - tr[t[y]])) * dir || x - y; }
+  const r = st.rank(key), a = c[key]; return (x, y) => (r[a[x]] - r[a[y]]) * dir || x - y;
+}
+/** 필터 결과에 검색·정렬 적용 (필터·검색·정렬 변경 시 1페이지로) */
+function rebuildTable(resetPage) {
+  const st = S.store, t = S.table; let idx = S.agg.idx;
+  const q = t.q.trim().toLowerCase();
+  if (q) {
+    const lower = st.nameLower(), hit = new Uint8Array(lower.length);
+    for (let j = 0; j < lower.length; j++) hit[j] = lower[j].includes(q) ? 1 : 0;
+    const nm = st.c.name, out = new Int32Array(idx.length); let k = 0;
+    for (let i = 0; i < idx.length; i++) if (hit[nm[idx[i]]]) out[k++] = idx[i];
+    idx = out.slice(0, k);
+  } else idx = idx.slice();
+  if (t.sortKey) idx.sort(makeComparator(st, t.sortKey, t.dir));
+  t.rows = idx;
+  if (resetPage) t.page = 1;
+  renderTableHead(); renderTablePage();
+}
+/** 한 행의 HTML */
+function rowHtml(st, i) {
+  const c = st.c;
+  return '<tr>' + TABLE_COLS.map(col => {
+    let v;
+    if (col.key === 'date') v = c.date[i] ? fmtDate(c.date[i]) : c.year[i] + (c.month[i] ? '-' + String(c.month[i]).padStart(2, '0') : '');
+    else if (col.type === 'num') v = fmt(c[col.key][i]);
+    else if (col.key === 'place') v = esc(shortPlace(st.label('place', c.place[i])));   // '예술의전당 ' 접두어 생략
+    else v = esc(col.key === 'time' || col.key === 'org' ? st.dict[col.key][c[col.key][i]] : st.label(col.key, c[col.key][i]));
+    return `<td class="${col.type === 'num' ? 'n' : col.cls || ''}">${v}</td>`;
+  }).join('') + '</tr>';
+}
+/** 현재 페이지 행만 DOM에 그림 */
+function renderTablePage() {
+  const st = S.store, t = S.table, total = t.rows.length, pages = Math.max(1, Math.ceil(total / t.size));
+  t.page = Math.min(Math.max(1, t.page), pages);
+  const a = (t.page - 1) * t.size, b = Math.min(total, a + t.size);
+  let html = ''; for (let r = a; r < b; r++) html += rowHtml(st, t.rows[r]);
+  $('tbl').tBodies[0].innerHTML = html || `<tr><td colspan="${TABLE_COLS.length}" class="empty">조건에 맞는 데이터가 없습니다.</td></tr>`;
+  $('tableInfo').textContent = total ? `전체 ${fmt(total)}건 중 ${fmt(a + 1)}–${fmt(b)}건 표시` : '전체 0건';
+  // 페이지 버튼: 처음 / 이전 / 번호(최대 7개) / 다음 / 끝
+  const win = 7; let s = Math.max(1, t.page - 3), e = Math.min(pages, s + win - 1); s = Math.max(1, e - win + 1);
+  const btn = (label, p, dis, cur, aria) => `<button type="button" data-page="${p}"${dis ? ' disabled' : ''}${cur ? ' class="cur" aria-current="page"' : ''} aria-label="${aria || label + '페이지'}">${label}</button>`;
+  let pg = btn('처음', 1, t.page === 1, false, '처음 페이지') + btn('이전', t.page - 1, t.page === 1, false, '이전 페이지');
+  for (let p = s; p <= e; p++) pg += btn(p, p, false, p === t.page);
+  pg += btn('다음', t.page + 1, t.page === pages, false, '다음 페이지') + btn('끝', pages, t.page === pages, false, '마지막 페이지');
+  $('pager').innerHTML = pg;
+}
+
+/* =========================================================
+   10. 업로드 · 복원 · 메시지
+   ========================================================= */
+function setLoading(text) { $('loadingText').textContent = text; $('loading').classList.add('show'); }
+function stopLoading() { $('loading').classList.remove('show'); }
+function showMsg(type, html) { const m = $('msg'); m.className = 'msg show ' + type; m.innerHTML = html; }
+
+/** 새 저장소로 교체 → 필터 초기화 → 전체 갱신 */
+function useStore(store, source, isDefault) {
+  S.store = store; S.source = source; S.isDefault = isDefault;
+  S.table.q = ''; S.table.sortKey = null; S.table.dir = 1; $('search').value = '';
+  buildFilterOptions(); renderSource(); refresh();
+}
+
+/** 파일 업로드 처리. 실패하면 기존 데이터를 그대로 유지 */
+async function handleFile(file) {
+  if (!file) return;
+  try {
+    const t0 = performance.now();
+    const res = await loadFile(file);
+    useStore(res.store, { file: file.name, sheet: res.sheet }, false);
+    const h = res.header, notes = [];
+    notes.push(h.depth === 2 ? `${h.row + 1}–${h.row + 2}행 다중 헤더` : `${h.row + 1}행 헤더`);
+    if (!h.map.field) notes.push('분야 열이 없어 시트명·장소로 추정');
+    if (!h.map.total) notes.push('관객수 열이 없어 무료+유료로 계산');
+    if (res.skipped) notes.push(`합계·연도 없는 행 ${fmt(res.skipped)}건 제외`);
+    if (res.badNum) notes.push(`숫자로 읽을 수 없는 값 ${fmt(res.badNum)}개는 0으로 처리`);
+    showMsg('ok', `<b>${esc(file.name)}</b>의 '<b>${esc(res.sheet)}</b>' 시트로 데이터를 교체했습니다. ` +
+      `${fmt(res.store.n)}건 · 총 입장객 ${fmt(S.agg.total)}명 · ${notes.join(' · ')} (${((performance.now() - t0) / 1000).toFixed(1)}초)`);
+  } catch (err) {
+    console.warn(err);
+    showMsg('err', `업로드 실패: ${esc(err.message || err)} — 기존 데이터를 그대로 유지합니다.`);
+  } finally {
+    stopLoading(); $('fileInput').value = '';
+  }
+}
+
+/* =========================================================
+   11. 이벤트 연결
+   ========================================================= */
+function bindEvents() {
+  // 필터 (debounce 적용)
+  [['fYear', 'year'], ['fField', 'field'], ['fPlace', 'place'], ['fGubun', 'gubun']].forEach(([id, key]) => {
+    $(id).addEventListener('change', e => { S.filter[key] = e.target.value; refreshDebounced(); });
+  });
+  $('btnReset').addEventListener('click', () => {
+    S.filter = { year: '', field: '', place: '', gubun: '' };
+    ['fYear', 'fField', 'fPlace', 'fGubun'].forEach(id => { $(id).value = ''; });
+    refresh();
+  });
+  // 검색 (debounce) · 페이지 크기 · 정렬 · 페이지 이동
+  $('search').addEventListener('input', debounce(e => { S.table.q = e.target.value; rebuildTable(true); }, 200));
+  $('pageSize').addEventListener('change', e => { S.table.size = +e.target.value; S.table.page = 1; renderTablePage(); });
+  $('tbl').tHead.addEventListener('click', e => {
+    const th = e.target.closest('th[data-key]'); if (!th) return;
+    const t = S.table, k = th.dataset.key;
+    if (t.sortKey === k) t.dir = -t.dir; else { t.sortKey = k; t.dir = TABLE_COLS.find(c => c.key === k).type === 'str' ? 1 : -1; }
+    rebuildTable(true);
+  });
+  $('pager').addEventListener('click', e => {
+    const b = e.target.closest('button[data-page]'); if (!b || b.disabled) return;
+    S.table.page = +b.dataset.page; renderTablePage();
+  });
+  // 업로드: 파일 선택 · 드래그 앤 드롭(영역 + 창 전체)
+  $('fileInput').addEventListener('change', e => handleFile(e.target.files[0]));
+  $('dropZone').addEventListener('keydown', e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); $('fileInput').click(); } });
+  let dragDepth = 0;
+  window.addEventListener('dragenter', e => { if ([...(e.dataTransfer?.types || [])].includes('Files')) { dragDepth++; $('dragCover').classList.add('show'); $('dropZone').classList.add('over'); } });
+  window.addEventListener('dragleave', () => { if (--dragDepth <= 0) { dragDepth = 0; $('dragCover').classList.remove('show'); $('dropZone').classList.remove('over'); } });
+  window.addEventListener('dragover', e => e.preventDefault());
+  window.addEventListener('drop', e => {
+    e.preventDefault(); dragDepth = 0; $('dragCover').classList.remove('show'); $('dropZone').classList.remove('over');
+    const f = e.dataTransfer?.files?.[0]; if (f) handleFile(f);
+  });
+  // 기본 데이터 복원
+  $('btnRestore').addEventListener('click', () => {
+    useStore(S.defaultStore, { ...DEFAULT_SOURCE }, true);
+    showMsg('info', '기본 데이터로 복원했습니다.');
+  });
+  // PDF 저장 (상세 표는 인쇄용 CSS에서 제외 → 요약 화면만 A4로 출력)
+  $('btnPrint').addEventListener('click', () => window.print());
+  // 창 크기 변경 시 SVG 차트만 다시 그림
+  window.addEventListener('resize', debounce(() => { if (S.agg) renderCharts(); }, 200));
+  // 툴팁 (위임 방식 하나로 모든 차트 처리)
+  const tip = $('tip');
+  document.addEventListener('mouseover', e => { const el = e.target.closest('[data-tip]'); if (el && el.dataset.tip) { tip.innerHTML = el.dataset.tip; tip.style.display = 'block'; } });
+  document.addEventListener('mouseout', e => { if (e.target.closest('[data-tip]') && !e.relatedTarget?.closest?.('[data-tip]')) tip.style.display = 'none'; });
+  document.addEventListener('mousemove', e => {
+    if (tip.style.display !== 'block') return;
+    const w = tip.offsetWidth, h = tip.offsetHeight;
+    tip.style.left = Math.min(e.clientX + 14, innerWidth - w - 8) + 'px';
+    tip.style.top = (e.clientY + h + 20 > innerHeight ? e.clientY - h - 12 : e.clientY + 14) + 'px';
+  });
+}
+
+/* =========================================================
+   12. 시작: 기본 데이터 불러오기
+   ========================================================= */
+function init() {
+  try {
+    const j = JSON.parse($('default-data').textContent);
+    S.defaultStore = storeFromEmbedded(j);
+    bindEvents();
+    useStore(S.defaultStore, { ...DEFAULT_SOURCE }, true);
+  } catch (err) {
+    console.error(err);
+    showMsg('err', '기본 데이터를 불러오지 못했습니다: ' + esc(err.message));
+  }
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

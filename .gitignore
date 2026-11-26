@@ -1,0 +1,13 @@
+# 원본 엑셀 데이터는 저장소에 올리지 않음 (대시보드 HTML에 필요한 열만 내장)
+assets/*.xlsx
+assets/*.xls
+assets/*.csv
+
+# 로컬 도구 설정
+.claude/
+.vercel/
+
+# OS 파일
+Thumbs.db
+desktop.ini
+.DS_Store

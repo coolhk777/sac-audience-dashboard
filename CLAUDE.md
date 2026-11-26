@@ -35,6 +35,13 @@ dashboard/
 - 이 PC에는 Python·Node가 없어 PowerShell 스크립트로 처리합니다. 한글이 든 `.ps1`은 **UTF-8 BOM**으로 저장해야 PowerShell 5.1에서 깨지지 않습니다.
 - 헤더 이름 매핑은 템플릿 JavaScript 맨 위의 `COLUMN_MAP`에서 고칩니다.
 
+### 배포
+
+- GitHub(Public): https://github.com/coolhk777/sac-audience-dashboard (`main` 브랜치)
+- Vercel: https://sac-audience-dashboard.vercel.app — `main`에 push하면 자동 재배포. 빌드 없이 정적 파일 그대로 서빙하고, `index.html`이 대시보드로 이동시킴
+- 원본 엑셀(`assets/*.xlsx`)은 `.gitignore`로 제외
+- 이 저장소의 커밋 이메일은 GitHub noreply 주소로 설정되어 있음(공개 저장소에 개인 이메일 노출 방지)
+
 ### 폴더별 규칙
 
 - **`archive/`**: 삭제하기 애매한 파일은 지우지 말고 이곳으로 옮깁니다.
